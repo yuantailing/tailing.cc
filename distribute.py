@@ -54,6 +54,11 @@ def replace():
             lines[i] = b''
             template.append(line)
     filled = []
+    def fill_next(context):
+        for line in template:
+            for k, v in context.items():
+                line = line.replace(k, v)
+            filled.append(line)
 
     def quote(b):
         def quote0(b):
@@ -67,17 +72,21 @@ def replace():
         for filename in sorted(os.listdir(os.path.join(base, d))):
             filepath = os.path.join(base, d, filename)
             if os.path.isfile(filepath):
+                uri = os.path.join(d, filename).replace('\\', '/')
                 with open(filepath, 'rb') as f:
                     file_content = f.read()
-                t = {
-                     b'TEMPLATE_URI': '"{}"'.format(os.path.join(d, filename).replace('\\', '/')).encode('utf-8'),
-                     b'TEMPLATE_CONTENT': quote(file_content),
-                     b'TEMPLATE_LENGTH': '{:d}'.format(len(file_content)).encode('utf-8'),
-                    }
-                for line in template:
-                    for k, v in t.items():
-                        line = line.replace(k, v)
-                    filled.append(line)
+                context = {
+                    b'TEMPLATE_URI': '"{}"'.format(uri).encode('utf-8'),
+                    b'TEMPLATE_CONTENT': quote(file_content),
+                    b'TEMPLATE_LENGTH': '{:d}'.format(len(file_content)).encode('utf-8'),
+                }
+                fill_next(context)
+                m =  re.match('^(.*)index\.s?html?$', uri)
+                if m:
+                    prefix = m.group(1)
+                    if prefix == '' or prefix.endswith('/'):
+                        context[b'TEMPLATE_URI'] = '"{}"'.format(prefix).encode('utf-8')
+                        fill_next(context)
             elif os.path.isdir(filepath):
                 walk(base, os.path.join(d, filename))
     walk('html', '')
@@ -131,7 +140,7 @@ def merge():
             if s not in required_stdheaders:
                 required_stdheaders.append(s)
             lines[i] = b''
-    lines = required_stdheaders + [b'', b''] + lines
+    lines = required_stdheaders + [b''] + lines
     mkdirs(dist_dir)
     with open(os.path.join(dist_dir, src_filename), 'wb') as f:
         for license in LICENSES:
@@ -151,6 +160,7 @@ def hack(filepath):
     with open(filepath, 'rb') as f:
         content = f.read()
     assert b'\r' not in content
+    assert b')NS0**"' not in content
     lines = content.splitlines()
     for i, line in enumerate(lines):
         if b'string HACK_SOURCECODE' in line:

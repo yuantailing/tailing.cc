@@ -13,8 +13,10 @@ int main() {
     TEMPLATE_FILERESPONSE_LIST
 
     std::string HACK_SOURCECODE("NOT FOUND");
-    CROW_ROUTE(app, "/tailing.cc")([&]() {
-        return HACK_SOURCECODE;
+    CROW_ROUTE(app, "/tailing.cc")([&](const crow::request &/* req */, crow::response &res) {
+        res.add_header("Content-Disposition", "attachment; filename=tailing.cc");
+        res.write(HACK_SOURCECODE);
+        res.end();
     });
 
     app.port(18080).multithreaded().run();

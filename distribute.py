@@ -164,11 +164,17 @@ def hack(filepath):
     lines = content.splitlines()
     for i, line in enumerate(lines):
         if b'string HACK_SOURCECODE' in line:
-            sentence_1 = b'std::string HACK_SOURCECODE_0(R"NS0**HACK_REPLACE_AS_NS1NS1**");'
-            sentence_2 = b'std::string HACK_SOURCECODE = HACK_SOURCECODE_0.replace(HACK_SOURCECODE_0.find("HACK_REPLACE_AS_NS1"), 19, ("NS1**(" + HACK_SOURCECODE_0 + ")NS0**").c_str());'
-            HACK_SOURCECODE_0 = content.replace(line, sentence_1 + sentence_2, 1)
+            HACK_SOURCECODE_0 = ''
+            for j in range(5, -1, -1):
+                last_len = len(HACK_SOURCECODE_0)
+                sentence_1 = b'std::string HACK_SOURCECODE_0(R"NS0**HACK_REPLACE_AS_NS1NS1**", ' + '{:d}'.format(len(HACK_SOURCECODE_0)).encode('utf-8') + b');'
+                sentence_2 = b'std::string HACK_SOURCECODE = HACK_SOURCECODE_0.replace(HACK_SOURCECODE_0.find("HACK_REPLACE_AS_NS1"), 19, ("NS1**(" + HACK_SOURCECODE_0 + ")NS0**"));'
+                HACK_SOURCECODE_0 = b'\n'.join(lines[:i] + [sentence_1 + sentence_2] + lines[i + 1:]) + b'\n'
+                if last_len == len(HACK_SOURCECODE_0):
+                    break
+                assert j > 0
             sentence_3 = b'std::string HACK_SOURCECODE_0(R"NS0**NS1**(' + HACK_SOURCECODE_0 + b')NS0**NS1**", ' + '{:d}'.format(len(HACK_SOURCECODE_0)).encode('utf-8') + b');'
-            HACK_SOURCECODE = content.replace(line, sentence_3 + sentence_2, 1)
+            HACK_SOURCECODE = b'\n'.join(lines[:i] + [sentence_3 + sentence_2] + lines[i + 1:]) + b'\n'
             with open(filepath, 'wb') as f:
                 f.write(HACK_SOURCECODE)
             break

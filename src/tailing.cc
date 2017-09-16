@@ -1,11 +1,16 @@
 #include "crow.h"
+#include <string>
 
 int main() {
     crow::SimpleApp app;
 
-    CROW_ROUTE(app, "/")([]() {
-        return "tailing.cc";
+    TEMPLATE_FILERESPONSE_START
+    CROW_ROUTE(app, "/"TEMPLATE_URI)([]() {
+        return std::string(TEMPLATE_CONTENT, TEMPLATE_LENGTH);
     });
+
+    TEMPLATE_FILERESPONSE_END
+    TEMPLATE_FILERESPONSE_LIST
 
     app.port(18080).multithreaded().run();
     return 0;

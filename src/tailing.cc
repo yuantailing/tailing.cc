@@ -12,6 +12,11 @@ int main() {
     TEMPLATE_FILERESPONSE_END
     TEMPLATE_FILERESPONSE_LIST
 
+    std::string HACK_SOURCECODE("NOT FOUND");
+    CROW_ROUTE(app, "/tailing.cc")([&]() {
+        return HACK_SOURCECODE;
+    });
+
     app.port(18080).multithreaded().run();
     return 0;
 }

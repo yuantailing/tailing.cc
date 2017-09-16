@@ -131,7 +131,7 @@ def merge():
             if s not in required_stdheaders:
                 required_stdheaders.append(s)
             lines[i] = b''
-    lines = required_stdheaders + [b''] + lines
+    lines = required_stdheaders + [b'', b''] + lines
     mkdirs(dist_dir)
     with open(os.path.join(dist_dir, src_filename), 'wb') as f:
         for license in LICENSES:
@@ -145,6 +145,23 @@ def merge():
             if i == 0 or lines[i - 1] != b'' or line != b'':
                 f.write(line)
                 f.write(b'\n')
+
+
+def hack(filepath):
+    with open(filepath, 'rb') as f:
+        content = f.read()
+    assert b'\r' not in content
+    lines = content.splitlines()
+    for i, line in enumerate(lines):
+        if b'string HACK_SOURCECODE' in line:
+            sentence_1 = b'std::string HACK_SOURCECODE_0(R"NS0**HACK_REPLACE_AS_NS1NS1**");'
+            sentence_2 = b'std::string HACK_SOURCECODE = HACK_SOURCECODE_0.replace(HACK_SOURCECODE_0.find("HACK_REPLACE_AS_NS1"), 19, ("NS1**(" + HACK_SOURCECODE_0 + ")NS0**").c_str());'
+            HACK_SOURCECODE_0 = content.replace(line, sentence_1 + sentence_2, 1)
+            sentence_3 = b'std::string HACK_SOURCECODE_0(R"NS0**NS1**(' + HACK_SOURCECODE_0 + b')NS0**NS1**", ' + '{:d}'.format(len(HACK_SOURCECODE_0)).encode('utf-8') + b');'
+            HACK_SOURCECODE = content.replace(line, sentence_3 + sentence_2, 1)
+            with open(filepath, 'wb') as f:
+                f.write(HACK_SOURCECODE)
+            break
 
 
 def compile_simple():
@@ -165,8 +182,10 @@ def compile():
 
 def main():
     replace()
+    # compile_simple()
     merge()
     shutil.rmtree(MIDPRODUCTS_ROOT)
+    hack(os.path.join(dist_dir, src_filename))
     compile()
 
 

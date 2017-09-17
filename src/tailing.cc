@@ -1,7 +1,8 @@
 #include "crow.h"
+#include <cstdlib>
 #include <string>
 
-int main() {
+int main(int argc, char *argv[]) {
     crow::SimpleApp app;
 
     TEMPLATE_FILERESPONSE_START
@@ -19,6 +20,9 @@ int main() {
         res.end();
     });
 
-    app.port(18080).multithreaded().run();
+    int port = 8888;
+    if (argc > 1)
+        port = atoi(argv[1]);
+    app.port(port).multithreaded().run();
     return 0;
 }

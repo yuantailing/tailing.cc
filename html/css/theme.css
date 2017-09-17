@@ -389,7 +389,6 @@ label {
   padding: 100px 0;
 }
 .section.type-1 {
-  background: #2a333b;
   color: #a5b3bf;
 }
 .section.type-1 h1,
@@ -440,7 +439,6 @@ label {
   height: 100%;
 }
 .section.splash {
-  background: url(../images/header/headerbg.jpg) fixed no-repeat;
   position: relative;
   z-index: 1;
 }

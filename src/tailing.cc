@@ -6,8 +6,12 @@ int main(int argc, char *argv[]) {
     crow::SimpleApp app;
 
     TEMPLATE_FILERESPONSE_START
-    CROW_ROUTE(app, "/"TEMPLATE_URI)([]() {
-        return std::string(TEMPLATE_CONTENT, TEMPLATE_LENGTH);
+    CROW_ROUTE(app, "/"TEMPLATE_URI)([](const crow::request &/* req */, crow::response &res) {
+        res.add_header("Content-Type", TEMPLATE_CONTENT_TYPE);
+        res.add_header("ETag", TEMPLATE_ETAG);
+        res.add_header("Last-Modified", TEMPLATE_LAST_MODIFIED);
+        res.write(std::string(TEMPLATE_CONTENT_STR, TEMPLATE_LENGTH));
+        res.end();
     });
 
     TEMPLATE_FILERESPONSE_END

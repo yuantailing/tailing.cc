@@ -41,7 +41,7 @@ p.console-fontsize {
 						<div class="row">
 							<div class="container">
 								<div class="col-md-offset-1 col-md-10" style="background: #000; padding: 30px; font-family: fixedsys, LucidaTerminal, monospace; color: #909090; text-align: left; overflow: auto; border: 5px solid #909090;">
-									<p class="console-fontsize">$ curl <a href="tailing.cc"><span class="display-protocol"></span>//<span class="display-host"></span>/tailing.cc</a> -o tailing.cc</p>
+									<p class="console-fontsize">$ curl <a href="tailing.cc"><span class="display-protocol">http:</span>//<span class="display-host">tailing.cc</span>/tailing.cc</a> -o tailing.cc</p>
 									<p class="console-fontsize">$ sudo apt install libboost-system-dev</p>
 									<p class="console-fontsize">$ g++ tailing.cc -std=c++11 -O2 -lpthread -lboost_system -orun</p>
 									<p class="console-fontsize">$ rm tailing.cc <font color="#606060"># Take it easy, you can soon download it from localhost</font></p>
@@ -65,10 +65,21 @@ p.console-fontsize {
 	<script src="https://cdn.bootcss.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
 	<script src="https://cdn.bootcss.com/jquery-smooth-scroll/2.2.0/jquery.smooth-scroll.min.js"></script>
 	<script>
-$(document).ready(function() {
-	$('.display-protocol').text(location.protocol);
-	$('.display-host').text(location.host);
-});
+function html_escape(raw_html) {
+	var text = document.createTextNode(raw_html);
+	var div = document.createElement('div');
+	div.appendChild(text);
+	return div.innerHTML;
+}
+
+var elems = document.getElementsByClassName('display-protocol');
+for (var i in elems) {
+	elems[i].innerHTML = html_escape(location.protocol);
+}
+elems = document.getElementsByClassName('display-host');
+for (var i in elems) {
+	elems[i].innerHTML = html_escape(location.host);
+}
 	</script>
 </body>
 </html>

@@ -7,12 +7,14 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 import base64
-import functools
+import hashlib
+import mimetypes
 import os
 import re
 import shutil
 import subprocess
 import sys
+import time
 
 
 CC = 'g++'
@@ -75,9 +77,13 @@ def replace():
                 uri = os.path.join(d, filename).replace('\\', '/')
                 with open(filepath, 'rb') as f:
                     file_content = f.read()
+                mime_type = mimetypes.guess_type(uri)
                 context = {
+                    b'TEMPLATE_CONTENT_TYPE': '"{}; charset=UTF-8"'.format(mimetypes.guess_type(uri)[0] or 'text/plain').encode('utf-8'),
+                    b'TEMPLATE_ETAG': '"\\"md5/{}\\""'.format(hashlib.md5(file_content).hexdigest()).encode('utf-8'),
+                    b'TEMPLATE_LAST_MODIFIED': '"{}"'.format(time.strftime("%a, %d %b %Y %H:%M:%S GMT", time.gmtime(os.path.getmtime(filepath)))).encode('utf-8'),
                     b'TEMPLATE_URI': '"{}"'.format(uri).encode('utf-8'),
-                    b'TEMPLATE_CONTENT': quote(file_content),
+                    b'TEMPLATE_CONTENT_STR': quote(file_content),
                     b'TEMPLATE_LENGTH': '{:d}'.format(len(file_content)).encode('utf-8'),
                 }
                 fill_next(context)

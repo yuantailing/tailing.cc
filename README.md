@@ -1,5 +1,5 @@
 # TaiLing.cc
-[TaiLing.cc](http://tailing.cc/) is compiled from [single C++ file](http://tailing.cc/tailing.cc), and produces sourcecode itself.
+[TaiLing.cc](http://tailing.cc/) is compiled from [single C++ file](http://tailing.cc/tailing.cc), and produces source code itself.
 
 ## Usage
 

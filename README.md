@@ -3,7 +3,7 @@
 
 ## Usage
 
-```
+```console
 $ git clone https://github.com/yuantailing/tailing.cc.git
 $ cd tailing.cc
 $ git submodule update --init --recursive

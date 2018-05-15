@@ -110,7 +110,7 @@ def merge():
                 mkdirs(os.path.dirname(fakepath))
                 with open(filepath, 'rb') as fin:
                     with open(fakepath, 'wb') as fout:
-                        for line in fin.read().splitlines():
+                        for line in fin.read().split(b'\n'):
                             s = line
                             if s.startswith(b'#include <'):
                                 s = b'int STDINCLUDE_' + base64.b16encode(s) + b' = 0;'
@@ -125,13 +125,13 @@ def merge():
                          stdin=None, stdout=subprocess.PIPE, stderr=sys.stderr)
     out, _ = p.communicate()
     assert 0 == p.wait()
-    lines = out.splitlines()
+    lines = out.split(b'\n')
 
     required_stdheaders = []
-    filter0 = re.compile(b'# \d+ ')
-    filter1 = re.compile(b'int STDINCLUDE_([a-zA-Z0-9]+) = 0;$')
+    filter0 = re.compile(br'^# \d+ \"')
+    filter1 = re.compile(br'int STDINCLUDE_([a-zA-Z0-9]+) = 0;$')
     for i, line in enumerate(lines):
-        if filter0.match(line) or not line.strip():
+        if filter0.match(line):
             lines[i] = b''
         elif filter1.match(line):
             m = filter1.match(line)
@@ -151,9 +151,8 @@ def merge():
                     f.write(b'\n')
                 f.write(b'\n\n')
         for i, line in enumerate(lines):
-            if i == 0 or lines[i - 1] != b'' or line != b'':
-                f.write(line)
-                f.write(b'\n')
+            f.write(line)
+            f.write(b'\n')
 
 
 def hack(filepath):
@@ -161,7 +160,7 @@ def hack(filepath):
         content = f.read()
     assert b'\r' not in content
     assert b')NS0**"' not in content
-    lines = content.splitlines()
+    lines = content.split(b'\n')
     for i, line in enumerate(lines):
         if b'string HACK_SOURCECODE' in line:
             HACK_SOURCECODE_0 = ''

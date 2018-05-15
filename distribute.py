@@ -32,11 +32,8 @@ v0_dir = 'simple'
 
 
 def mkdirs(path):
-    parent = os.path.dirname(path)
-    if parent and not os.path.isdir(parent):
-        mkdirs(parent)
     if not os.path.isdir(path):
-        os.mkdir(path)
+        os.makedirs(path)
 
 
 def replace():
@@ -70,32 +67,30 @@ def replace():
         l = b.split(b'\r')
         return b'"\\r" '.join(map(lambda b: quote0(b), l))
 
-    def walk(base, d):
-        for filename in sorted(os.listdir(os.path.join(base, d))):
-            filepath = os.path.join(base, d, filename)
-            if os.path.isfile(filepath):
-                uri = os.path.join(d, filename).replace('\\', '/')
-                with open(filepath, 'rb') as f:
-                    file_content = f.read()
-                mime_type = mimetypes.guess_type(uri)
-                context = {
-                    b'TEMPLATE_CONTENT_TYPE': '"{}; charset=UTF-8"'.format(mimetypes.guess_type(uri)[0] or 'text/plain').encode('utf-8'),
-                    b'TEMPLATE_ETAG': '"\\"md5/{}\\""'.format(hashlib.md5(file_content).hexdigest()).encode('utf-8'),
-                    b'TEMPLATE_LAST_MODIFIED': '"{}"'.format(time.strftime("%a, %d %b %Y %H:%M:%S GMT", time.gmtime(os.path.getmtime(filepath)))).encode('utf-8'),
-                    b'TEMPLATE_URI': '"{}"'.format(uri).encode('utf-8'),
-                    b'TEMPLATE_CONTENT_STR': quote(file_content),
-                    b'TEMPLATE_LENGTH': '{:d}'.format(len(file_content)).encode('utf-8'),
-                }
-                fill_next(context)
-                m =  re.match('^(.*)index\.s?html?$', uri)
-                if m:
-                    prefix = m.group(1)
-                    if prefix == '' or prefix.endswith('/'):
-                        context[b'TEMPLATE_URI'] = '"{}"'.format(prefix).encode('utf-8')
-                        fill_next(context)
-            elif os.path.isdir(filepath):
-                walk(base, os.path.join(d, filename))
-    walk('html', '')
+    www_root = 'www'
+    for dirpath, dirnames, filenames in os.walk(www_root, followlinks=True):
+        for filename in filenames:
+            filepath = os.path.join(dirpath, filename)
+            uri = os.path.relpath(filepath, www_root).replace('\\', '/')
+            with open(filepath, 'rb') as f:
+                file_content = f.read()
+            mime_type = mimetypes.guess_type(uri)
+            context = {
+                b'TEMPLATE_CONTENT_TYPE': '"{}; charset=UTF-8"'.format(mimetypes.guess_type(uri)[0] or 'text/plain').encode('utf-8'),
+                b'TEMPLATE_ETAG': '"\\"md5/{}\\""'.format(hashlib.md5(file_content).hexdigest()).encode('utf-8'),
+                b'TEMPLATE_LAST_MODIFIED': '"{}"'.format(time.strftime("%a, %d %b %Y %H:%M:%S GMT", time.gmtime(os.path.getmtime(filepath)))).encode('utf-8'),
+                b'TEMPLATE_URI': '"{}"'.format(uri).encode('utf-8'),
+                b'TEMPLATE_CONTENT_STR': quote(file_content),
+                b'TEMPLATE_LENGTH': '{:d}'.format(len(file_content)).encode('utf-8'),
+            }
+            fill_next(context)
+            m =  re.match('^(.*)index\.s?html?$', uri)
+            if m:
+                prefix = m.group(1)
+                if prefix == '' or prefix.endswith('/'):
+                    context[b'TEMPLATE_URI'] = '"{}"'.format(prefix).encode('utf-8')
+                    fill_next(context)
+
     for i, line in enumerate(lines):
         if line.strip() == b'TEMPLATE_FILERESPONSE_LIST':
             lines = lines[:i] + filled + lines[i + 1:]
@@ -107,11 +102,11 @@ def replace():
 
 
 def merge():
-    def walk(din, dout, dmid):
-        for filename in os.listdir(os.path.join(din, dmid)):
-            filepath = os.path.join(din, dmid, filename)
-            if os.path.isfile(filepath):
-                fakepath = os.path.join(dout, dmid, filename)
+    def encode(din, dout):
+        for dirpath, dirnames, filenames in os.walk(din, followlinks=True):
+            for filename in filenames:
+                filepath = os.path.join(dirpath, filename)
+                fakepath = os.path.join(dout, os.path.relpath(dirpath, din), filename)
                 mkdirs(os.path.dirname(fakepath))
                 with open(filepath, 'rb') as fin:
                     with open(fakepath, 'wb') as fout:
@@ -121,11 +116,10 @@ def merge():
                                 s = b'int STDINCLUDE_' + base64.b16encode(s) + b' = 0;'
                             fout.write(s)
                             fout.write(b'\n')
-            elif os.path.isdir(filepath):
-                walk(din, dout, os.path.join(dmid, filename))
-    mkdirs(os.path.join(MIDPRODUCTS_ROOT, CROW_INCLUDE_DIR))
-    walk(CROW_INCLUDE_DIR, os.path.join(MIDPRODUCTS_ROOT, CROW_INCLUDE_DIR), '')
-    walk(os.path.join(MIDPRODUCTS_ROOT, v0_dir), os.path.join(MIDPRODUCTS_ROOT, src_dir), '')
+    encode(CROW_INCLUDE_DIR, os.path.join(MIDPRODUCTS_ROOT, CROW_INCLUDE_DIR))
+    encode(os.path.join(MIDPRODUCTS_ROOT, v0_dir), os.path.join(MIDPRODUCTS_ROOT, src_dir))
+
+
     p = subprocess.Popen([CPP, os.path.join(MIDPRODUCTS_ROOT, src_dir, src_filename), '-nostdinc',
                           '-I{}'.format(os.path.join(MIDPRODUCTS_ROOT, CROW_INCLUDE_DIR)), '-std=c++11'],
                          stdin=None, stdout=subprocess.PIPE, stderr=sys.stderr)

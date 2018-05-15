@@ -5,7 +5,7 @@ before_install:
   - sudo apt install libboost-system-dev
 script:
   - python distribute.py
-  - cp -r html docs && cp dist/tailing.cc docs/
+  - cp -r www docs && cp dist/tailing.cc docs/
 deploy:
   provider: pages
   skip-cleanup: true

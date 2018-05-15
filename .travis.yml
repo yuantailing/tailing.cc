@@ -1,0 +1,16 @@
+language: python
+python:
+  - "3.6"
+before_install:
+  - sudo apt install libboost-system-dev
+script:
+  - python distribute.py
+  - cp -r html docs && cp dist/tailing.cc docs/
+deploy:
+  provider: pages
+  skip-cleanup: true
+  github-token: $GITHUB_TOKEN
+  on:
+    branch: master
+  local-dir: docs
+  fqdn: tailing.cc

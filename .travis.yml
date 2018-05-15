@@ -5,6 +5,8 @@ before_install:
   - sudo apt install libboost-system-dev
 script:
   - python distribute.py
+  - python test.py
+after_success:
   - cp -r www docs && cp dist/tailing.cc docs/
 deploy:
   provider: pages

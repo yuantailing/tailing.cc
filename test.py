@@ -17,28 +17,26 @@ def main():
     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     s.bind(('127.0.0.1', 0))
     port = s.getsockname()[1]
-    with open(os.devnull, 'wb') as stderr:
-        p = subprocess.Popen([os.path.join('dist', 'run'), '{:d}'.format(port)], stderr=stderr)
-        baseurl = 'http://localhost:{:d}/'.format(port)
-        www_root = 'www'
-        
-        def assertEqual(uri, filepath):
-            request = urllib.request.Request('{:s}{:s}'.format(baseurl, uri))
-            response = urllib.request.urlopen(request)
-            page_content = response.read()
-            with open(filepath, 'rb') as f:
-                file_content = f.read()
-            assert page_content == file_content, uri
-        
-        
-        for dirpath, dirnames, filenames in os.walk(www_root, followlinks=True):
-            for filename in filenames:
-                filepath = os.path.join(dirpath, filename)
-                uri = os.path.relpath(filepath, www_root).replace('\\', '/')
-                assertEqual(uri, filepath)
-        assertEqual('tailing.cc', 'dist/tailing.cc')
-        p.terminate()
-        assert 0 == p.wait()
+    p = subprocess.Popen([os.path.join('dist', 'run'), '{:d}'.format(port)])
+    baseurl = 'http://localhost:{:d}/'.format(port)
+    www_root = 'www'
+
+    def assertEqual(uri, filepath):
+        request = urllib.request.Request('{:s}{:s}'.format(baseurl, uri))
+        response = urllib.request.urlopen(request)
+        page_content = response.read()
+        with open(filepath, 'rb') as f:
+            file_content = f.read()
+        assert page_content == file_content, uri
+
+    for dirpath, dirnames, filenames in os.walk(www_root, followlinks=True):
+        for filename in filenames:
+            filepath = os.path.join(dirpath, filename)
+            uri = os.path.relpath(filepath, www_root).replace('\\', '/')
+            assertEqual(uri, filepath)
+    assertEqual('tailing.cc', 'dist/tailing.cc')
+    p.terminate()
+    assert 0 == p.wait()
 
 
 if __name__ == '__main__':

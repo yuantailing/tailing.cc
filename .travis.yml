@@ -6,7 +6,6 @@ before_install:
 script:
   - python distribute.py
   - python test.py
-after_success:
   - cp -r www docs && cp dist/tailing.cc docs/
 deploy:
   provider: pages

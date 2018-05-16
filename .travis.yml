@@ -2,7 +2,7 @@ language: python
 python:
   - "3.6"
 before_install:
-  - sudo apt install libboost-system-dev
+  - sudo apt-get --yes install libboost-system-dev
 script:
   - python distribute.py
   - python test.py

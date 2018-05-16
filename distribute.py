@@ -113,17 +113,17 @@ def merge():
                         for line in fin.read().split(b'\n'):
                             s = line
                             if s.startswith(b'#include <'):
-                                s = b'int STDINCLUDE_' + base64.b16encode(s) + b' = 0;'
+                                s = b'int STDINCLUDE_' + base64.b16encode(s.strip()) + b' = 0;'
                             fout.write(s)
                             fout.write(b'\n')
     encode(CROW_INCLUDE_DIR, os.path.join(MIDPRODUCTS_ROOT, CROW_INCLUDE_DIR))
     encode(os.path.join(MIDPRODUCTS_ROOT, v0_dir), os.path.join(MIDPRODUCTS_ROOT, src_dir))
 
-
     p = subprocess.Popen([CPP, os.path.join(MIDPRODUCTS_ROOT, src_dir, src_filename), '-nostdinc',
                           '-I{}'.format(os.path.join(MIDPRODUCTS_ROOT, CROW_INCLUDE_DIR)), '-std=c++11'],
                          stdin=None, stdout=subprocess.PIPE, stderr=sys.stderr)
     out, _ = p.communicate()
+    out = out.replace(b'\r\n', b'\n')
     assert 0 == p.wait()
     lines = out.split(b'\n')
 

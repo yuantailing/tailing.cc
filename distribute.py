@@ -20,7 +20,7 @@ import time
 CC = 'g++'
 CPP = 'cpp'
 src_dir = 'src'
-dist_dir = 'dist'
+dist_dir = 'build'
 src_filename = 'tailing.cc'
 TARGET = 'run'
 

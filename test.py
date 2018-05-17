@@ -17,7 +17,7 @@ def main():
     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     s.bind(('127.0.0.1', 0))
     port = s.getsockname()[1]
-    p = subprocess.Popen([os.path.join('dist', 'run'), '{:d}'.format(port)])
+    p = subprocess.Popen([os.path.join('build', 'run'), '{:d}'.format(port)])
     baseurl = 'http://localhost:{:d}/'.format(port)
     www_root = 'www'
 
@@ -34,7 +34,7 @@ def main():
             filepath = os.path.join(dirpath, filename)
             uri = os.path.relpath(filepath, www_root).replace('\\', '/')
             assertEqual(uri, filepath)
-    assertEqual('tailing.cc', 'dist/tailing.cc')
+    assertEqual('tailing.cc', os.path.join('build', 'tailing.cc'))
     p.terminate()
     assert 0 == p.wait()
 

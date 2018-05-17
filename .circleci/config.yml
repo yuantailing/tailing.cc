@@ -16,10 +16,10 @@ jobs:
           name: Build
           command: python distribute.py
       - persist_to_workspace:
-          root: dist
+          root: build
           paths:
             - "*"
-      - run: cp -r www docs && cp dist/tailing.cc docs/
+      - run: cp -r www docs && cp build/tailing.cc docs/
       - store_artifacts:
           path: docs/
           destination: gh-pages
@@ -35,7 +35,7 @@ jobs:
             sudo apt-get --yes install libboost-system-dev
             sudo -H pip install -r requirements.txt
       - attach_workspace:
-          at: dist
+          at: build
       - run:
           name: Test
           command: python test.py

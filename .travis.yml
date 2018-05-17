@@ -6,7 +6,7 @@ before_install:
 script:
   - python distribute.py
   - python test.py
-  - cp -r www docs && cp -r .circleci dist/tailing.cc docs/
+  - cp -r www docs && cp -r .circleci build/tailing.cc docs/
 deploy:
   provider: pages
   skip-cleanup: true

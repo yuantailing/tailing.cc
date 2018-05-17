@@ -2,7 +2,42 @@ version: 2
 jobs:
   build:
     docker:
-      - image: circleci/ruby:2.4.1
+      - image: circleci/python:3
     steps:
       - checkout
-      - run: echo "A first hello"
+      - run:
+          name: Requirements
+          command: |
+            set -e -x
+            git submodule update --init
+            sudo apt-get --yes install libboost-system-dev
+            sudo -H pip install -r requirements.txt
+      - run:
+          name: Version
+          command: |
+            set -e -x
+            python --version
+            pip --version
+      - run:
+          name: Build
+          command: python distribute.py
+      - run:
+          name: Test
+          command: python test.py
+      - run: cp -r www docs && cp dist/tailing.cc docs/
+      - store_artifacts:
+          path: docs/
+          destination: gh-pages
+  test:
+    docker:
+      - image: circleci/python:3
+    steps:
+      - checkout
+      - run: python --version
+      - run: sudo -H pip install -r requirements.txt
+      - run: python test.py
+
+general:
+  branches:
+    ignore:
+      - gh-pages

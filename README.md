@@ -1,6 +1,7 @@
 # TaiLing.cc
 
 [![Build Status](https://travis-ci.com/yuantailing/tailing.cc.svg?branch=master)](https://travis-ci.com/yuantailing/tailing.cc)
+[![CircleCI](https://circleci.com/gh/yuantailing/tailing.cc.svg?style=svg)](https://circleci.com/gh/yuantailing/tailing.cc)
 
 [TaiLing.cc](http://tailing.cc/) is compiled from [single C++ file](http://tailing.cc/tailing.cc), and produces source code itself.
 

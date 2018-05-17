@@ -13,17 +13,12 @@ jobs:
             sudo apt-get --yes install libboost-system-dev
             sudo -H pip install -r requirements.txt
       - run:
-          name: Version
-          command: |
-            set -e -x
-            python --version
-            pip --version
-      - run:
           name: Build
           command: python distribute.py
-      - run:
-          name: Test
-          command: python test.py
+      - persist_to_workspace:
+          root: dist
+          paths:
+            - "*"
       - run: cp -r www docs && cp dist/tailing.cc docs/
       - store_artifacts:
           path: docs/
@@ -33,11 +28,31 @@ jobs:
       - image: circleci/python:3
     steps:
       - checkout
-      - run: python --version
-      - run: sudo -H pip install -r requirements.txt
-      - run: python test.py
+      - run:
+          name: Requirements
+          command: |
+            set -e -x
+            sudo apt-get --yes install libboost-system-dev
+            sudo -H pip install -r requirements.txt
+      - attach_workspace:
+          at: dist
+      - run:
+          name: Test
+          command: python test.py
 
-general:
-  branches:
-    ignore:
-      - gh-pages
+workflows:
+  version: 2
+  build_and_test:
+    jobs:
+      - build:
+          filters:
+            branches:
+              ignore:
+                - gh-pages
+      - test:
+          filters:
+            branches:
+              ignore:
+                - gh-pages
+          requires:
+            - build

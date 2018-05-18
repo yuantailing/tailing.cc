@@ -17,7 +17,7 @@ import sys
 import time
 
 
-CC = 'g++'
+CXX = 'g++'
 CPP = 'cpp'
 src_dir = 'src'
 dist_dir = 'build'
@@ -180,7 +180,7 @@ def hack(filepath):
 
 
 def compile_simple():
-    ARGS = [CC, os.path.join(MIDPRODUCTS_ROOT, v0_dir, src_filename), '-I{}'.format(CROW_INCLUDE_DIR), '-pipe', '-std=c++11', '-O2', '-lpthread', '-lboost_system',
+    ARGS = [CXX, os.path.join(MIDPRODUCTS_ROOT, v0_dir, src_filename), '-I{}'.format(CROW_INCLUDE_DIR), '-pipe', '-std=c++11', '-O2', '-Wall', '-lpthread', '-lboost_system',
             '-o{}'.format(os.path.join(dist_dir, TARGET))]
     print(' '.join(ARGS))
     p = subprocess.Popen(ARGS, stdin=None, stdout=sys.stdout, stderr=sys.stderr)
@@ -188,7 +188,7 @@ def compile_simple():
 
 
 def compile():
-    ARGS = [CC, os.path.join(dist_dir, src_filename), '-pipe', '-std=c++11', '-O2', '-lpthread', '-lboost_system',
+    ARGS = [CXX, os.path.join(dist_dir, src_filename), '-pipe', '-std=c++11', '-O2', '-Wall', '-lpthread', '-lboost_system',
             '-o{}'.format(os.path.join(dist_dir, TARGET))]
     print(' '.join(ARGS))
     p = subprocess.Popen(ARGS, stdin=None, stdout=sys.stdout, stderr=sys.stderr)

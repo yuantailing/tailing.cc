@@ -35,7 +35,7 @@ p.console-fontsize {
 						<div>
 							<h1>TaiLing.cc</h1>
 							<p>is compiled from single C++ file,</p>
-							<p>and produces sourcecode itself.</p>
+							<p>and produces the sourcecode itself.</p>
 						</div>
 						<div class="row">
 							<div class="col-1"></div>
@@ -53,7 +53,7 @@ p.console-fontsize {
 							&nbsp;
 							<a href="https://github.com/yuantailing/tailing.cc" class="btn btn-outline btn-lg">Github</a>
 						</div>
-						<p style="font-size: 14px; padding-top: 20px;">&copy; 2018 <a style="color: #fff;" href="https://github.com/yuantailing">Tailing Yuan</a></p>
+						<p style="font-size: 14px; padding-top: 20px;">&copy; <script>document.write((new Date()).getFullYear());</script> <a style="color: #fff;" href="https://github.com/yuantailing">Tailing Yuan</a></p>
 					</div>
 				</div>
 			</div>
@@ -65,7 +65,7 @@ p.console-fontsize {
 	var pos = location.href.lastIndexOf('/');
 	var path_to_cc = location.href.slice(0, pos + 1) + 'tailing.cc';
 	var elems = document.getElementsByClassName('path-to-cc');
-	for (var i in elems) {
+	for (var i = 0; i < elems.length; i++) {
 		elems[i].textContent = path_to_cc;
 	}
 })();

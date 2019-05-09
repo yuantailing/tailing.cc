@@ -1,0 +1,58 @@
+version: 2
+jobs:
+  build:
+    docker:
+      - image: circleci/python:3
+    steps:
+      - checkout
+      - run:
+          name: Requirements
+          command: |
+            set -e -x
+            git submodule update --init
+            sudo apt-get --yes install libboost-system-dev
+            sudo -H pip install -r requirements.txt
+      - run:
+          name: Build
+          command: python distribute.py
+      - persist_to_workspace:
+          root: build
+          paths:
+            - "*"
+      - run: cp -r www docs && cp build/tailing.cc docs/
+      - store_artifacts:
+          path: docs/
+          destination: gh-pages
+  test:
+    docker:
+      - image: circleci/python:3
+    steps:
+      - checkout
+      - run:
+          name: Requirements
+          command: |
+            set -e -x
+            sudo apt-get --yes install libboost-system-dev
+            sudo -H pip install -r requirements.txt
+      - attach_workspace:
+          at: build
+      - run:
+          name: Test
+          command: python test.py
+
+workflows:
+  version: 2
+  build_and_test:
+    jobs:
+      - build:
+          filters:
+            branches:
+              ignore:
+                - gh-pages
+      - test:
+          filters:
+            branches:
+              ignore:
+                - gh-pages
+          requires:
+            - build

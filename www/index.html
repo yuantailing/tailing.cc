@@ -7,10 +7,12 @@
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>TaiLing.cc</title>
 	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
-	<link rel="stylesheet" href="css/fonts.css">
 	<link rel="stylesheet" href="css/theme.css">
 	<style>
-body {
+.header {
+	position: fixed;
+	width: 100%;
+	height: 100%;
 	background-image: url(images/header/headerbg.jpg);
 	background-size: 100% 100%;
 }
@@ -27,10 +29,11 @@ p.console-fontsize {
 	</style>
 </head>
 <body>
+	<div class="header"></div>
 	<div class="section type-1 big splash">
 		<div class="container">
-			<div class="splash-block">
-				<div class="centered">
+			<div class="splash-block" style="text-align: center;">
+				<div class="centered" style="width: 90%; padding-top: 50px; padding-bottom: 50px;">
 					<div class="container">
 						<div>
 							<h1>TaiLing.cc</h1>
@@ -39,7 +42,7 @@ p.console-fontsize {
 						</div>
 						<div class="row">
 							<div class="col-1"></div>
-							<div class="col-10" style="background: #000; padding: 30px; font-family: fixedsys, LucidaTerminal, monospace; color: #909090; text-align: left; overflow: auto; border: 5px solid #909090;">
+							<div class="col-10" style="background: #000; padding: 30px; font-family: monospace, consolas; color: #909090; text-align: left; overflow: auto; border: 5px solid #909090;">
 								<p class="console-fontsize">$ curl <a class="path-to-cc" href="tailing.cc">http://tailing.cc/tailing.cc</a> -o tailing.cc</p>
 								<p class="console-fontsize">$ sudo apt install libboost-system-dev</p>
 								<p class="console-fontsize">$ g++ tailing.cc -std=c++11 -O2 -lpthread -lboost_system -orun</p>

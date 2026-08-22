@@ -28,6 +28,15 @@ CROW_INCLUDE_DIR = os.path.join('crow', 'include')
 MIDPRODUCTS_ROOT = '.midproducts'
 LICENSES = ['LICENSE', os.path.join('crow', 'LICENSE')]
 
+# Boost >= 1.70 removed the get_io_service() member of I/O objects; crow
+# (frozen upstream) still calls it, so patch the two call sites while merging.
+CROW_PATCHES = [
+    (b'return socket_.get_io_service();',
+     b'return static_cast<boost::asio::io_service&>(socket_.get_executor().context());'),
+    (b'return raw_socket().get_io_service();',
+     b'return static_cast<boost::asio::io_service&>(raw_socket().get_executor().context());'),
+]
+
 v0_dir = 'simple'
 
 
@@ -112,6 +121,8 @@ def merge():
                     with open(fakepath, 'wb') as fout:
                         for line in fin.read().split(b'\n'):
                             s = line
+                            for old, new in CROW_PATCHES:
+                                s = s.replace(old, new)
                             if s.startswith(b'#include <'):
                                 s = b'int STDINCLUDE_' + base64.b16encode(s.strip()) + b' = 0;'
                             fout.write(s)

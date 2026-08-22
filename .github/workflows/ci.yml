@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install requirements
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes libboost-system-dev
+          pip install -r requirements.txt
+
+      - name: Build
+        run: python distribute.py
+
+      - name: Test
+        run: python test.py
+
+      - name: Prepare site
+        run: |
+          cp -r www docs
+          cp build/tailing.cc docs/
+
+      - name: Upload site artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gh-pages
+          path: docs/
+
+      - name: Deploy to GitHub Pages
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs
+          cname: tailing.cc

@@ -10,9 +10,8 @@
 $ git clone https://github.com/yuantailing/tailing.cc.git
 $ cd tailing.cc
 $ git submodule update --init --recursive
-$ sudo apt install libboost-system-dev
 $ python distribute.py
-$ g++ build/tailing.cc -std=c++11 -O2 -lpthread -lboost_system -obuild/run
+$ g++ build/tailing.cc -std=c++11 -O2 -lpthread -obuild/run
 $ build/run 8888
 ```
 

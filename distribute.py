@@ -6,7 +6,6 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
-import base64
 import hashlib
 import mimetypes
 import os
@@ -18,24 +17,15 @@ import time
 
 
 CXX = 'g++'
-CPP = 'cpp'
 src_dir = 'src'
 dist_dir = 'build'
 src_filename = 'tailing.cc'
 TARGET = 'run'
 
-CROW_INCLUDE_DIR = os.path.join('crow', 'include')
+HTTPLIB_DIR = 'cpp-httplib'
+HTTPLIB_HEADER = 'httplib.h'
 MIDPRODUCTS_ROOT = '.midproducts'
-LICENSES = ['LICENSE', os.path.join('crow', 'LICENSE')]
-
-# Boost >= 1.70 removed the get_io_service() member of I/O objects; crow
-# (frozen upstream) still calls it, so patch the two call sites while merging.
-CROW_PATCHES = [
-    (b'return socket_.get_io_service();',
-     b'return static_cast<boost::asio::io_service&>(socket_.get_executor().context());'),
-    (b'return raw_socket().get_io_service();',
-     b'return static_cast<boost::asio::io_service&>(raw_socket().get_executor().context());'),
-]
+LICENSES = ['LICENSE', os.path.join(HTTPLIB_DIR, 'LICENSE')]
 
 v0_dir = 'simple'
 
@@ -71,7 +61,6 @@ def replace():
     def quote(b):
         def quote0(b):
             assert b')***' not in b
-            assert b'int STDINCLUDE_' not in b
             return b'R"***(' + b + b')***"'
         l = b.split(b'\r')
         return b'"\\r" '.join(map(lambda b: quote0(b), l))
@@ -110,48 +99,30 @@ def replace():
             f.write(b'\n')
 
 
-def merge():
-    def encode(din, dout):
-        for dirpath, dirnames, filenames in os.walk(din, followlinks=True):
-            for filename in filenames:
-                filepath = os.path.join(dirpath, filename)
-                fakepath = os.path.join(dout, os.path.relpath(dirpath, din), filename)
-                mkdirs(os.path.dirname(fakepath))
-                with open(filepath, 'rb') as fin:
-                    with open(fakepath, 'wb') as fout:
-                        for line in fin.read().split(b'\n'):
-                            s = line
-                            for old, new in CROW_PATCHES:
-                                s = s.replace(old, new)
-                            if s.startswith(b'#include <'):
-                                s = b'int STDINCLUDE_' + base64.b16encode(s.strip()) + b' = 0;'
-                            fout.write(s)
-                            fout.write(b'\n')
-    encode(CROW_INCLUDE_DIR, os.path.join(MIDPRODUCTS_ROOT, CROW_INCLUDE_DIR))
-    encode(os.path.join(MIDPRODUCTS_ROOT, v0_dir), os.path.join(MIDPRODUCTS_ROOT, src_dir))
-
-    p = subprocess.Popen([CPP, os.path.join(MIDPRODUCTS_ROOT, src_dir, src_filename), '-nostdinc',
-                          '-I{}'.format(os.path.join(MIDPRODUCTS_ROOT, CROW_INCLUDE_DIR)), '-std=c++11'],
-                         stdin=None, stdout=subprocess.PIPE, stderr=sys.stderr)
+def strip_comments(filepath):
+    # -fpreprocessed keeps every directive unexpanded, so the merged file still
+    # carries cpp-httplib's platform #ifdefs and compiles anywhere it does;
+    # -E -P then only drops the comments. Warnings about macros redefined in
+    # branches that are never taken together are expected and harmless.
+    ARGS = [CXX, '-fpreprocessed', '-dD', '-E', '-P', '-x', 'c++', filepath]
+    p = subprocess.Popen(ARGS, stdin=None, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     out, _ = p.communicate()
-    out = out.replace(b'\r\n', b'\n')
     assert 0 == p.wait()
-    lines = out.split(b'\n')
+    return out.replace(b'\r\n', b'\n')
 
-    required_stdheaders = []
-    filter0 = re.compile(br'^# \d+ \"')
-    filter1 = re.compile(br'int STDINCLUDE_([a-zA-Z0-9]+) = 0;$')
-    for i, line in enumerate(lines):
-        if filter0.match(line):
-            lines[i] = b''
-        elif filter1.match(line):
-            m = filter1.match(line)
-            sbase = m.group(1)
-            s = base64.b16decode(sbase.decode('utf-8'))
-            if s not in required_stdheaders:
-                required_stdheaders.append(s)
-            lines[i] = b''
-    lines = required_stdheaders + [b''] + lines
+
+def merge():
+    header = strip_comments(os.path.join(HTTPLIB_DIR, HTTPLIB_HEADER))
+
+    # cpp-httplib ships as one header, so merging is a concatenation: the
+    # library takes the place of the #include that pulled it in.
+    with open(os.path.join(MIDPRODUCTS_ROOT, v0_dir, src_filename), 'rb') as f:
+        source = f.read().replace(b'\r\n', b'\n')
+    include_line = '#include "{}"\n'.format(HTTPLIB_HEADER).encode('utf-8')
+    assert include_line in source
+    source = source.replace(include_line, b'')
+
+    lines = header.split(b'\n') + [b''] + source.split(b'\n')
     mkdirs(dist_dir)
     with open(os.path.join(dist_dir, src_filename), 'wb') as f:
         for license in LICENSES:
@@ -191,7 +162,7 @@ def hack(filepath):
 
 
 def compile_simple():
-    ARGS = [CXX, os.path.join(MIDPRODUCTS_ROOT, v0_dir, src_filename), '-I{}'.format(CROW_INCLUDE_DIR), '-pipe', '-std=c++11', '-O2', '-Wall', '-lpthread', '-lboost_system',
+    ARGS = [CXX, os.path.join(MIDPRODUCTS_ROOT, v0_dir, src_filename), '-I{}'.format(HTTPLIB_DIR), '-pipe', '-std=c++11', '-O2', '-Wall', '-lpthread',
             '-o{}'.format(os.path.join(dist_dir, TARGET))]
     print(' '.join(ARGS))
     p = subprocess.Popen(ARGS, stdin=None, stdout=sys.stdout, stderr=sys.stderr)
@@ -199,7 +170,7 @@ def compile_simple():
 
 
 def compile():
-    ARGS = [CXX, os.path.join(dist_dir, src_filename), '-pipe', '-std=c++11', '-O2', '-Wall', '-lpthread', '-lboost_system',
+    ARGS = [CXX, os.path.join(dist_dir, src_filename), '-pipe', '-std=c++11', '-O2', '-Wall', '-lpthread',
             '-o{}'.format(os.path.join(dist_dir, TARGET))]
     print(' '.join(ARGS))
     p = subprocess.Popen(ARGS, stdin=None, stdout=sys.stdout, stderr=sys.stderr)

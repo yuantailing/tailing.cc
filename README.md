@@ -6,27 +6,27 @@
 
 ## Usage
 
-```console
-$ git clone https://github.com/yuantailing/tailing.cc.git
-$ cd tailing.cc
-$ git submodule update --init --recursive
-$ python distribute.py
-$ g++ build/tailing.cc -std=c++11 -O2 -lpthread -obuild/run
-$ build/run 8888
+```bash
+git clone https://github.com/yuantailing/tailing.cc.git
+cd tailing.cc
+git submodule update --init --recursive
+python distribute.py
+g++ build/tailing.cc -std=c++11 -O2 -lpthread -obuild/run
+build/run 8888
 ```
 
 Then you can browse `localhost:8888`.
 
 On Windows, build with MSYS2/MinGW:
 
-```console
-$ g++ build/tailing.cc -std=c++11 -O2 -lpthread -lws2_32 -obuild/run
+```bash
+g++ build/tailing.cc -std=c++11 -O2 -lpthread -lws2_32 -obuild/run
 ```
 
 or with MSVC, which links the sockets library on its own:
 
-```console
-> cl /EHsc /O2 build\tailing.cc /Febuild\run.exe
+```bat
+cl /EHsc /O2 build\tailing.cc /Febuild\run.exe
 ```
 
 ## Requirements

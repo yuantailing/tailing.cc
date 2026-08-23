@@ -27,6 +27,8 @@ TARGET = 'run'
 
 HTTPLIB_DIR = 'cpp-httplib'
 HTTPLIB_HEADER = 'httplib.h'
+# An R"delim( ... )delim" opener, as opposed to an identifier ending in R.
+RAW_STRING = re.compile(br'(?:^|[^A-Za-z0-9_])R"')
 MIDPRODUCTS_ROOT = '.midproducts'
 LICENSES = ['LICENSE', os.path.join(HTTPLIB_DIR, 'LICENSE')]
 
@@ -185,56 +187,22 @@ def replace():
             f.write(b'\n')
 
 
-def copy_quoted(data, i, out):
-    """Copy a "..." or '...' literal whole, and answer where it ended.
-
-    A literal that does not close on its line is not one: that leading quote is
-    an ordinary character, so copy just it and carry on.
-    """
-    quote = data[i:i + 1]
-    j = i + 1
-    while j < len(data):
-        c = data[j:j + 1]
-        if c == b'\\':
-            j += 2
-            continue
-        if c == quote:
-            j += 1
-            break
-        if c == b'\n':
-            j = i + 1
-            break
-        j += 1
-    else:
-        j = i + 1
-    out.append(data[i:j])
-    return j
-
-
-def copy_raw(data, i, out):
-    """Copy an R"delim( ... )delim" literal whole, and answer where it ended."""
-    opening = data.find(b'(', i + 2)
-    assert opening >= 0, 'unterminated raw string literal'
-    closing = b')' + data[i + 2:opening] + b'"'
-    end = data.find(closing, opening + 1)
-    assert end >= 0, 'unterminated raw string literal'
-    end += len(closing)
-    out.append(data[i:end])
-    return end
-
-
 def strip_comments(filepath):
     """Drop the comments and leave every other byte where it was.
 
     Done here rather than by the compiler so that the build needs no particular
     one: MSVC has no counterpart to the GCC flags that strip comments while
-    leaving the directives alone, and both platforms have to produce the same
-    file anyway. Everything else survives, so the merged file keeps the
-    platform #ifdefs and compiles wherever the header does.
+    leaving the directives alone. Everything else survives, so the merged file
+    keeps the platform #ifdefs and compiles wherever the header does.
     """
     with open(filepath, 'rb') as f:
         data = f.read().replace(b'\r\n', b'\n')
-    identifier = b'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_'
+    # A quote opens a literal everywhere except inside a raw string, which this
+    # does not read as one. The single raw string cpp-httplib carries comes out
+    # untouched anyway, its quotes pairing up around content with no comment
+    # marker in it; a second one has to be looked at rather than quietly
+    # mangled, since a "//" in there would take the rest of the line with it.
+    assert len(RAW_STRING.findall(data)) == 1, 'a new raw string literal turned up'
     out = []
     i = 0
     while i < len(data):
@@ -254,10 +222,28 @@ def strip_comments(filepath):
             assert end >= 0, 'unterminated block comment'
             i = end + 2
             out.append(b' ')
-        elif pair[1:2] == b'"' and pair[0:1] == b'R' and data[i - 1:i] not in identifier:
-            i = copy_raw(data, i, out)
         elif pair[0:1] in (b'"', b"'"):
-            i = copy_quoted(data, i, out)
+            # Whatever is in here is text, not code: "http://..." holds no
+            # comment. A quote that does not close on its line was not opening
+            # a literal, so it counts as an ordinary byte.
+            quote = pair[0:1]
+            j = i + 1
+            while j < len(data):
+                c = data[j:j + 1]
+                if c == b'\\':
+                    j += 2
+                    continue
+                if c == quote:
+                    j += 1
+                    break
+                if c == b'\n':
+                    j = i + 1
+                    break
+                j += 1
+            else:
+                j = i + 1
+            out.append(data[i:j])
+            i = j
         else:
             out.append(data[i:i + 1])
             i += 1

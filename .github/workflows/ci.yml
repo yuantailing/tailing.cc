@@ -58,11 +58,17 @@ jobs:
         with:
           name: gh-pages
 
+      # The compiler environment lives in the step that sets it up, so this one
+      # has to both enter it and build.
       - name: Compile with MSVC
-        shell: cmd
+        shell: pwsh
         run: |
-          for /f "usebackq tokens=*" %%i in (`"C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products "*" -property installationPath`) do call "%%i\VC\Auxiliary\Build\vcvars64.bat"
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vs = & $vswhere -latest -products * -property installationPath
+          Import-Module "$vs\Common7\Tools\Microsoft.VisualStudio.DevShell.dll"
+          Enter-VsDevShell -VsInstallPath $vs -SkipAutomaticLocation -DevCmdArguments '-arch=x64' | Out-Null
           cl /nologo /EHsc /O2 tailing.cc /Ferun.exe
+          if ($LASTEXITCODE -ne 0) { throw 'MSVC could not build the distributed file' }
 
       - name: Check it serves back the source it was built from
         shell: pwsh

@@ -46,3 +46,59 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./docs
           cname: tailing.cc
+
+  # Run the whole build on Windows with MSVC, so that neither the generator nor
+  # the file it writes depends on having a Unix toolchain around.
+  msvc:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      # The compiler environment lives only in the step that enters it, so this
+      # one has to both enter it and build.
+      - name: Build with MSVC
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vs = & $vswhere -latest -products * -property installationPath
+          Import-Module "$vs\Common7\Tools\Microsoft.VisualStudio.DevShell.dll"
+          Enter-VsDevShell -VsInstallPath $vs -SkipAutomaticLocation -DevCmdArguments '-arch=x64' | Out-Null
+          # The runner carries a GCC of its own. Take it away, so that getting
+          # through the build is proof that MSVC alone was enough.
+          foreach ($name in 'g++', 'gcc', 'cc') {
+            while ($found = Get-Command $name -ErrorAction SilentlyContinue) {
+              $drop = Split-Path $found.Source
+              Write-Output "dropping $drop from PATH ($name)"
+              $env:PATH = ($env:PATH -split ';' | Where-Object { $_ -and $_ -ne $drop }) -join ';'
+            }
+          }
+          python distribute.py
+          if ($LASTEXITCODE -ne 0) { throw 'distribute.py failed under MSVC' }
+
+      - name: Check the binary serves back the source it was built from
+        shell: pwsh
+        run: |
+          $server = Start-Process -FilePath build\run.exe -ArgumentList 8888 -PassThru
+          try {
+            foreach ($attempt in 1..60) {
+              try {
+                Invoke-WebRequest -Uri http://127.0.0.1:8888/tailing.cc -OutFile roundtrip.cc -UseBasicParsing
+                break
+              } catch {
+                Start-Sleep -Milliseconds 500
+              }
+            }
+          } finally {
+            Stop-Process -Id $server.Id -Force
+          }
+          if (-not (Test-Path roundtrip.cc)) { throw 'the server never answered' }
+          $built = (Get-FileHash build\tailing.cc -Algorithm SHA256).Hash
+          $served = (Get-FileHash roundtrip.cc -Algorithm SHA256).Hash
+          if ($built -ne $served) { throw 'the server does not serve the source it was built from' }
+          Write-Output "identical, sha256 $built"

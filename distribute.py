@@ -16,7 +16,10 @@ import sys
 import time
 
 
-CXX = 'g++'
+# Nothing but the compiler is needed to build, so take whichever one the
+# platform comes with unless told otherwise.
+CXX = os.environ.get('CXX', 'cl' if os.name == 'nt' else 'g++')
+MSVC = os.path.splitext(os.path.basename(CXX))[0].lower() == 'cl'
 src_dir = 'src'
 dist_dir = 'build'
 src_filename = 'tailing.cc'
@@ -24,6 +27,8 @@ TARGET = 'run'
 
 HTTPLIB_DIR = 'cpp-httplib'
 HTTPLIB_HEADER = 'httplib.h'
+# An R"delim( ... )delim" opener, as opposed to an identifier ending in R.
+RAW_STRING = re.compile(br'(?:^|[^A-Za-z0-9_])R"')
 MIDPRODUCTS_ROOT = '.midproducts'
 LICENSES = ['LICENSE', os.path.join(HTTPLIB_DIR, 'LICENSE')]
 
@@ -183,15 +188,66 @@ def replace():
 
 
 def strip_comments(filepath):
-    # -fpreprocessed keeps every directive unexpanded, so the merged file still
-    # carries cpp-httplib's platform #ifdefs and compiles anywhere it does;
-    # -E -P then only drops the comments. Warnings about macros redefined in
-    # branches that are never taken together are expected and harmless.
-    ARGS = [CXX, '-fpreprocessed', '-dD', '-E', '-P', '-x', 'c++', filepath]
-    p = subprocess.Popen(ARGS, stdin=None, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    out, _ = p.communicate()
-    assert 0 == p.wait()
-    return out.replace(b'\r\n', b'\n')
+    """Drop the comments and leave every other byte where it was.
+
+    Done here rather than by the compiler so that the build needs no particular
+    one: MSVC has no counterpart to the GCC flags that strip comments while
+    leaving the directives alone. Everything else survives, so the merged file
+    keeps the platform #ifdefs and compiles wherever the header does.
+    """
+    with open(filepath, 'rb') as f:
+        data = f.read().replace(b'\r\n', b'\n')
+    # A quote opens a literal everywhere except inside a raw string, which this
+    # does not read as one. The single raw string cpp-httplib carries comes out
+    # untouched anyway, its quotes pairing up around content with no comment
+    # marker in it; a second one has to be looked at rather than quietly
+    # mangled, since a "//" in there would take the rest of the line with it.
+    assert len(RAW_STRING.findall(data)) == 1, 'a new raw string literal turned up'
+    out = []
+    i = 0
+    while i < len(data):
+        pair = data[i:i + 2]
+        if pair == b'//':
+            i += 2
+            while i < len(data):
+                if data[i:i + 2] == b'\\\n':
+                    i += 2          # the comment goes on into the next line
+                    continue
+                if data[i:i + 1] == b'\n':
+                    break
+                i += 1
+            out.append(b' ')        # a comment stands for one space
+        elif pair == b'/*':
+            end = data.find(b'*/', i + 2)
+            assert end >= 0, 'unterminated block comment'
+            i = end + 2
+            out.append(b' ')
+        elif pair[0:1] in (b'"', b"'"):
+            # Whatever is in here is text, not code: "http://..." holds no
+            # comment. A quote that does not close on its line was not opening
+            # a literal, so it counts as an ordinary byte.
+            quote = pair[0:1]
+            j = i + 1
+            while j < len(data):
+                c = data[j:j + 1]
+                if c == b'\\':
+                    j += 2
+                    continue
+                if c == quote:
+                    j += 1
+                    break
+                if c == b'\n':
+                    j = i + 1
+                    break
+                j += 1
+            else:
+                j = i + 1
+            out.append(data[i:j])
+            i = j
+        else:
+            out.append(data[i:i + 1])
+            i += 1
+    return b''.join(out)
 
 
 def merge():
@@ -241,16 +297,33 @@ def hack(filepath):
 
 
 def compile_simple():
-    ARGS = [CXX, os.path.join(MIDPRODUCTS_ROOT, v0_dir, src_filename), '-I{}'.format(HTTPLIB_DIR), '-pipe', '-std=c++11', '-O2', '-Wall', '-lpthread',
-            '-o{}'.format(os.path.join(dist_dir, TARGET))]
+    source = os.path.join(MIDPRODUCTS_ROOT, v0_dir, src_filename)
+    target = os.path.join(dist_dir, TARGET)
+    if MSVC:
+        ARGS = [CXX, '/nologo', '/EHsc', '/O2', '/I{}'.format(HTTPLIB_DIR), source,
+                '/Fe{}.exe'.format(target), '/Fo{}{}'.format(dist_dir, os.sep)]
+    else:
+        ARGS = [CXX, source, '-I{}'.format(HTTPLIB_DIR), '-pipe', '-std=c++11', '-O2', '-Wall', '-lpthread']
+        if os.name == 'nt':
+            ARGS.append('-lws2_32')
+        ARGS.append('-o{}'.format(target))
     print(' '.join(ARGS))
     p = subprocess.Popen(ARGS, stdin=None, stdout=sys.stdout, stderr=sys.stderr)
     assert 0 == p.wait()
 
 
 def compile():
-    ARGS = [CXX, os.path.join(dist_dir, src_filename), '-pipe', '-std=c++11', '-O2', '-Wall', '-lpthread',
-            '-o{}'.format(os.path.join(dist_dir, TARGET))]
+    source = os.path.join(dist_dir, src_filename)
+    target = os.path.join(dist_dir, TARGET)
+    if MSVC:
+        # cl links the sockets library itself, through a pragma in the header.
+        ARGS = [CXX, '/nologo', '/EHsc', '/O2', source,
+                '/Fe{}.exe'.format(target), '/Fo{}{}'.format(dist_dir, os.sep)]
+    else:
+        ARGS = [CXX, source, '-pipe', '-std=c++11', '-O2', '-Wall', '-lpthread']
+        if os.name == 'nt':
+            ARGS.append('-lws2_32')
+        ARGS.append('-o{}'.format(target))
     print(' '.join(ARGS))
     p = subprocess.Popen(ARGS, stdin=None, stdout=sys.stdout, stderr=sys.stderr)
     assert 0 == p.wait()

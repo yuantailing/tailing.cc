@@ -170,7 +170,7 @@ def replace():
                 b'TEMPLATE_LENGTH': '{:d}'.format(len(file_content)).encode('utf-8'),
             }
             fill_next(context)
-            m =  re.match('^(.*)index\.s?html?$', uri)
+            m =  re.match(r'^(.*)index\.s?html?$', uri)
             if m:
                 prefix = m.group(1)
                 if prefix == '' or prefix.endswith('/'):

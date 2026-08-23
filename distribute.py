@@ -27,12 +27,99 @@ HTTPLIB_HEADER = 'httplib.h'
 MIDPRODUCTS_ROOT = '.midproducts'
 LICENSES = ['LICENSE', os.path.join(HTTPLIB_DIR, 'LICENSE')]
 
+# The source file is an ordinary program that keeps its own source in a string.
+# This declaration is the only seam it has to offer; everything that fills the
+# string lives here.
+SOURCE_PLACEHOLDER = b'std::string HACK_SOURCECODE("NOT FOUND");'
+# Stands in for the copy while the file is being written.
+SOURCE_MARKER = b'@SELF_SOURCE@'
+# MSVC rejects a string literal longer than 16380 bytes, so they are split.
+ESCAPE_WIDTH = 8000
+
+# The C++ half of escape(), emitted in place of the declaration above with the
+# escaped source as its argument. What the compiler hands it is the file with
+# the marker still standing in; escaping that back and dropping it where the
+# marker sits reproduces the file. The two escapers have to agree byte for
+# byte, so they are kept next to each other.
+SOURCE_EXPANSION = r'''std::string HACK_SOURCECODE = [](const std::string &t) -> std::string {
+        std::string e;
+        std::string::size_type c = 0;
+        bool o = false;
+        for (std::string::size_type i = 0; i < t.size(); i++) {
+            unsigned char x = static_cast<unsigned char>(t[i]);
+            char b[4];
+            std::string::size_type n;
+            if (x == '\\' || x == '"' || x == '?') {
+                b[0] = '\\'; b[1] = static_cast<char>(x); n = 2; o = false;
+            } else if (x == '\n') {
+                b[0] = '\\'; b[1] = 'n'; n = 2; o = false;
+            } else if (0x20 <= x && x <= 0x7e && !(o && '0' <= x && x <= '9')) {
+                b[0] = static_cast<char>(x); n = 1; o = false;
+            } else {
+                b[0] = '\\';
+                b[1] = static_cast<char>('0' + ((x >> 6) & 7));
+                b[2] = static_cast<char>('0' + ((x >> 3) & 7));
+                b[3] = static_cast<char>('0' + (x & 7));
+                n = 4; o = true;
+            }
+            if (c != 0 && c + n > WIDTHu) { e += "\"\n\""; c = 0; }
+            e.append(b, n);
+            c += n;
+        }
+        std::string r(t);
+        return r.replace(r.find("@" "MARKERTAIL"), MARKERLEN, e);
+    }("PAYLOAD");'''
+
+SOURCE_EXPANSION_HEAD, SOURCE_EXPANSION_TAIL = (SOURCE_EXPANSION
+    .replace('WIDTH', '{:d}'.format(ESCAPE_WIDTH))
+    .replace('MARKERTAIL', SOURCE_MARKER[1:].decode('ascii'))
+    .replace('MARKERLEN', '{:d}'.format(len(SOURCE_MARKER)))
+    .encode('ascii').split(b'PAYLOAD'))
+
 v0_dir = 'simple'
 
 
 def mkdirs(path):
     if not os.path.isdir(path):
         os.makedirs(path)
+
+
+def escape(data):
+    """Render bytes as the inside of a C++ string literal.
+
+    Escaping instead of picking a raw-string delimiter no byte sequence happens
+    to contain keeps the output pure ASCII, so no compiler has to guess the
+    encoding of the source file, and no literal outgrows what MSVC parses.
+    Must agree byte for byte with SOURCE_EXPANSION, which does the same thing
+    at run time.
+    """
+    out = []
+    column = 0
+    after_octal = False
+    for i in range(len(data)):
+        c = ord(data[i:i + 1])
+        if c in (0x5c, 0x22, 0x3f):
+            # '?' is escaped because trigraphs are still live under -std=c++11.
+            token = '\\' + chr(c)
+            after_octal = False
+        elif c == 0x0a:
+            token = '\\n'
+            after_octal = False
+        elif 0x20 <= c <= 0x7e and not (after_octal and 0x30 <= c <= 0x39):
+            token = chr(c)
+            after_octal = False
+        else:
+            # Octal, not hex: \x swallows every hex digit that follows it. A
+            # digit right after an octal escape reads as part of it, and MSVC
+            # warns about that (C4125), so those get escaped too.
+            token = '\\{:03o}'.format(c)
+            after_octal = True
+        if column and column + len(token) > ESCAPE_WIDTH:
+            out.append('"\n"')
+            column = 0
+        out.append(token)
+        column += len(token)
+    return ''.join(out).encode('ascii')
 
 
 def replace():
@@ -59,11 +146,7 @@ def replace():
             filled.append(line)
 
     def quote(b):
-        def quote0(b):
-            assert b')***' not in b
-            return b'R"***(' + b + b')***"'
-        l = b.split(b'\r')
-        return b'"\\r" '.join(map(lambda b: quote0(b), l))
+        return b'"' + escape(b) + b'"'
 
     www_root = 'www'
     for dirpath, dirnames, filenames in os.walk(www_root, followlinks=True):
@@ -138,27 +221,23 @@ def merge():
 
 
 def hack(filepath):
+    """Put a copy of the file into the file.
+
+    No fixed point to search for: the marker stands in for the copy while the
+    escaping runs, and what it stands for never changes its length.
+    """
     with open(filepath, 'rb') as f:
-        content = f.read()
-    assert b'\r' not in content
-    assert b')NS0**"' not in content
-    lines = content.split(b'\n')
-    for i, line in enumerate(lines):
-        if b'string HACK_SOURCECODE' in line:
-            HACK_SOURCECODE_0 = ''
-            for j in range(5, -1, -1):
-                last_len = len(HACK_SOURCECODE_0)
-                sentence_1 = b'std::string HACK_SOURCECODE_0(R"NS0**HACK_REPLACE_AS_NS1NS1**", ' + '{:d}'.format(len(HACK_SOURCECODE_0)).encode('utf-8') + b');'
-                sentence_2 = b'std::string HACK_SOURCECODE = HACK_SOURCECODE_0.replace(HACK_SOURCECODE_0.find("HACK_REPLACE_AS_NS1"), 19, ("NS1**(" + HACK_SOURCECODE_0 + ")NS0**"));'
-                HACK_SOURCECODE_0 = b'\n'.join(lines[:i] + [sentence_1 + sentence_2] + lines[i + 1:]) + b'\n'
-                if last_len == len(HACK_SOURCECODE_0):
-                    break
-                assert j > 0
-            sentence_3 = b'std::string HACK_SOURCECODE_0(R"NS0**NS1**(' + HACK_SOURCECODE_0 + b')NS0**NS1**", ' + '{:d}'.format(len(HACK_SOURCECODE_0)).encode('utf-8') + b');'
-            HACK_SOURCECODE = b'\n'.join(lines[:i] + [sentence_3 + sentence_2] + lines[i + 1:]) + b'\n'
-            with open(filepath, 'wb') as f:
-                f.write(HACK_SOURCECODE)
-            break
+        merged = f.read()
+    assert merged.count(SOURCE_PLACEHOLDER) == 1, 'the placeholder must occur exactly once'
+    assert SOURCE_MARKER not in merged, 'the marker must not occur in the source'
+
+    def expand(literal):
+        return SOURCE_EXPANSION_HEAD + literal + SOURCE_EXPANSION_TAIL
+
+    # What the compiler will hand back at run time: this file, marker and all.
+    staged = merged.replace(SOURCE_PLACEHOLDER, expand(SOURCE_MARKER))
+    with open(filepath, 'wb') as f:
+        f.write(merged.replace(SOURCE_PLACEHOLDER, expand(escape(staged))))
 
 
 def compile_simple():

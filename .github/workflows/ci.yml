@@ -47,33 +47,44 @@ jobs:
           publish_dir: ./docs
           cname: tailing.cc
 
-  # Build the file people actually download, with the compiler that has the
-  # least in common with the one that produced it.
+  # Run the whole build on Windows with MSVC, so that neither the generator nor
+  # the file it writes depends on having a Unix toolchain around.
   msvc:
-    needs: build-and-test
     runs-on: windows-latest
     steps:
-      - name: Download the distributed file
-        uses: actions/download-artifact@v4
+      - uses: actions/checkout@v4
         with:
-          name: gh-pages
+          submodules: recursive
 
-      # The compiler environment lives in the step that sets it up, so this one
-      # has to both enter it and build.
-      - name: Compile with MSVC
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      # The compiler environment lives only in the step that enters it, so this
+      # one has to both enter it and build.
+      - name: Build with MSVC
         shell: pwsh
         run: |
           $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
           $vs = & $vswhere -latest -products * -property installationPath
           Import-Module "$vs\Common7\Tools\Microsoft.VisualStudio.DevShell.dll"
           Enter-VsDevShell -VsInstallPath $vs -SkipAutomaticLocation -DevCmdArguments '-arch=x64' | Out-Null
-          cl /nologo /EHsc /O2 tailing.cc /Ferun.exe
-          if ($LASTEXITCODE -ne 0) { throw 'MSVC could not build the distributed file' }
+          # The runner carries a GCC of its own. Take it away, so that getting
+          # through the build is proof that MSVC alone was enough.
+          foreach ($name in 'g++', 'gcc', 'cc') {
+            while ($found = Get-Command $name -ErrorAction SilentlyContinue) {
+              $drop = Split-Path $found.Source
+              Write-Output "dropping $drop from PATH ($name)"
+              $env:PATH = ($env:PATH -split ';' | Where-Object { $_ -and $_ -ne $drop }) -join ';'
+            }
+          }
+          python distribute.py
+          if ($LASTEXITCODE -ne 0) { throw 'distribute.py failed under MSVC' }
 
-      - name: Check it serves back the source it was built from
+      - name: Check the binary serves back the source it was built from
         shell: pwsh
         run: |
-          $server = Start-Process -FilePath .\run.exe -ArgumentList 8888 -PassThru
+          $server = Start-Process -FilePath build\run.exe -ArgumentList 8888 -PassThru
           try {
             foreach ($attempt in 1..60) {
               try {
@@ -87,7 +98,7 @@ jobs:
             Stop-Process -Id $server.Id -Force
           }
           if (-not (Test-Path roundtrip.cc)) { throw 'the server never answered' }
-          $built = (Get-FileHash tailing.cc -Algorithm SHA256).Hash
+          $built = (Get-FileHash build\tailing.cc -Algorithm SHA256).Hash
           $served = (Get-FileHash roundtrip.cc -Algorithm SHA256).Hash
           if ($built -ne $served) { throw 'the server does not serve the source it was built from' }
           Write-Output "identical, sha256 $built"

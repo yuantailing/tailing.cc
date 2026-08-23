@@ -46,3 +46,42 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./docs
           cname: tailing.cc
+
+  # Build the file people actually download, with the compiler that has the
+  # least in common with the one that produced it.
+  msvc:
+    needs: build-and-test
+    runs-on: windows-latest
+    steps:
+      - name: Download the distributed file
+        uses: actions/download-artifact@v4
+        with:
+          name: gh-pages
+
+      - name: Compile with MSVC
+        shell: cmd
+        run: |
+          for /f "usebackq tokens=*" %%i in (`"C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products "*" -property installationPath`) do call "%%i\VC\Auxiliary\Build\vcvars64.bat"
+          cl /nologo /EHsc /O2 tailing.cc /Ferun.exe
+
+      - name: Check it serves back the source it was built from
+        shell: pwsh
+        run: |
+          $server = Start-Process -FilePath .\run.exe -ArgumentList 8888 -PassThru
+          try {
+            foreach ($attempt in 1..60) {
+              try {
+                Invoke-WebRequest -Uri http://127.0.0.1:8888/tailing.cc -OutFile roundtrip.cc -UseBasicParsing
+                break
+              } catch {
+                Start-Sleep -Milliseconds 500
+              }
+            }
+          } finally {
+            Stop-Process -Id $server.Id -Force
+          }
+          if (-not (Test-Path roundtrip.cc)) { throw 'the server never answered' }
+          $built = (Get-FileHash tailing.cc -Algorithm SHA256).Hash
+          $served = (Get-FileHash roundtrip.cc -Algorithm SHA256).Hash
+          if ($built -ne $served) { throw 'the server does not serve the source it was built from' }
+          Write-Output "identical, sha256 $built"
